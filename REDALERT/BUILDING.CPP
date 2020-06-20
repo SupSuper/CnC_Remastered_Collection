@@ -1623,7 +1623,8 @@ BuildingClass::BuildingClass(StructType type, HousesType house) :
 	WhomToRepay(TARGET_NONE),
 	AnimToTrack(TARGET_NONE),
 	LastStrength(0),
-	PlacementDelay(0)
+	PlacementDelay(0),
+	RallyPoint(0)
 {
 	House->Tracking_Add(this);
 	IsSecondShot = !Class->Is_Two_Shooter();
@@ -1849,6 +1850,11 @@ void BuildingClass::Active_Click_With(ActionType action, CELL cell)
 		COORDINATE coord = Map.Pixel_To_Coord(Get_Mouse_X(), Get_Mouse_Y());
 		OutList.Add(EventClass(ANIM_MOVE_FLASH, PlayerPtr->Class->House, coord));
 	}
+
+	if (action == ACTION_MOVE && Class->Is_Factory()) {
+		RallyPoint = Map.Pixel_To_Coord(Get_Mouse_X(), Get_Mouse_Y());
+		OutList.Add(EventClass(ANIM_MOVE_FLASH, PlayerPtr->Class->House, RallyPoint));
+	}
 }
 
 
@@ -2042,6 +2048,10 @@ int BuildingClass::Exit_Object(TechnoClass * base)
 						base->Mark(MARK_UP);
 						base->Coord = Exit_Coord();
 						base->Mark(MARK_DOWN);
+						if (RallyPoint != 0) {
+							base->Assign_Mission(MISSION_MOVE);
+							base->Assign_Destination(::As_Target(RallyPoint));
+						}
 						Transmit_Message(RADIO_HELLO, base);
 						Transmit_Message(RADIO_TETHER);
 						Assign_Mission(MISSION_UNLOAD);
@@ -2070,6 +2080,9 @@ int BuildingClass::Exit_Object(TechnoClass * base)
 							**	center of the base.
 							*/
 							base->Assign_Destination(::As_Target(cell));
+							if (RallyPoint != 0) {
+								base->Assign_Destination(::As_Target(RallyPoint));
+							}
 							if (House->IQ >= Rule.IQGuardArea) {
 								base->Assign_Mission(MISSION_GUARD_AREA);
 								base->ArchiveTarget = ::As_Target(House->Where_To_Go((FootClass *)base));
@@ -2890,6 +2903,37 @@ ActionType BuildingClass::What_Action(CELL cell) const
 		action = ACTION_NONE;
 	}
 
+	if (action == ACTION_NONE && Class->Is_Factory() && PlayerPtr == House) {
+		SpeedType rallySpeed = SPEED_NONE;
+		switch (Class->ToBuild) {
+		case RTTI_INFANTRYTYPE:
+		case RTTI_INFANTRY:
+			rallySpeed = SPEED_FOOT;
+			break;
+
+		case RTTI_AIRCRAFTTYPE:
+		case RTTI_AIRCRAFT:
+			rallySpeed = SPEED_WINGED;
+			break;
+
+		case RTTI_UNITTYPE:
+		case RTTI_UNIT:
+			rallySpeed = SPEED_TRACK;
+			break;
+
+		case RTTI_VESSELTYPE:
+		case RTTI_VESSEL:
+			rallySpeed = SPEED_FLOAT;
+			break;
+
+		default:
+			break;
+		}
+		if (rallySpeed != SPEED_NONE) {
+			return(Map[cell].Is_Clear_To_Move(rallySpeed, true, true) ? ACTION_MOVE : ACTION_NOMOVE);
+		}
+	}
+
 	return(action);
 }
 
@@ -3318,6 +3362,11 @@ bool BuildingClass::Captured(HouseClass * newowner)
 		if (oldowner) {
 			oldowner->Check_Pertinent_Structures();
 		}
+
+		/*
+		** Make sure we clear the rally point so AIs don't get confused.
+		*/
+		RallyPoint = 0;
 
 		return(true);
 	}

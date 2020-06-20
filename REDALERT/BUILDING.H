@@ -208,6 +208,11 @@ class BuildingClass : public TechnoClass
 		*/
 		CDTimerClass<FrameTimerClass> PlacementDelay;
 
+		/*
+		**  This is a custom destination for units produced by the building.
+		*/
+		COORDINATE RallyPoint;
+
 		/*---------------------------------------------------------------------
 		**	Constructors, Destructors, and overloaded operators.
 		*/
@@ -352,8 +357,10 @@ class BuildingClass : public TechnoClass
 
 		/*
 		** Some additional padding in case we need to add data to the class and maintain backwards compatibility for save/load
+		** 32
+		** -4 RallyPoint
 		*/
-		unsigned char SaveLoadPadding[32];
+		unsigned char SaveLoadPadding[28];
 
 		static COORDINATE const CenterOffset[BSIZE_COUNT];
 };
